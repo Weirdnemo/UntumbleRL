@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="detumble_rl">
+
+  <compiler angle="radian" autolimits="true"/>
+
+  <option
+    gravity="0 0 0"
+    timestep="0.01"
+    integrator="RK4"
+    cone="elliptic"
+    impratio="10"
+    tolerance="1e-10">
+    <flag contact="disable"/>
+  </option>
+
+  <size njmax="500" nconmax="100"/>
+
+  <visual>
+    <global azimuth="120" elevation="-25" fovy="60"/>
+    <quality shadowsize="2048" offsamples="8"/>
+    <headlight ambient="0.15 0.15 0.20" diffuse="0.8 0.8 0.9" specular="0.3 0.3 0.3"/>
+    <rgba haze="0.0 0.0 0.0 0"/>
+    <map stiffness="100" stiffnessrot="100" znear="0.01" zfar="500"/>
+  </visual>
+
+  <asset>
+    <texture name="starfield" type="skybox" builtin="gradient"
+             rgb1="0.00 0.00 0.02"
+             rgb2="0.01 0.01 0.04"
+             width="512" height="512"
+             mark="random" markrgb="1 1 1" random="0.005"/>
+
+    <material name="chaser_body_mat"
+              rgba="0.78 0.78 0.82 1.0"
+              specular="0.85" shininess="0.7" reflectance="0.4"/>
+
+    <material name="chaser_panel_mat"
+              rgba="0.08 0.12 0.42 1.0"
+              specular="0.6" shininess="0.5"/>
+
+    <material name="debris_body_mat"
+              rgba="0.50 0.46 0.42 1.0"
+              specular="0.25" shininess="0.15"/>
+
+    <material name="debris_panel_mat"
+              rgba="0.10 0.10 0.16 1.0"
+              specular="0.15" shininess="0.1"/>
+
+    <material name="thruster_mat"
+              rgba="0.18 0.18 0.20 1.0"
+              specular="0.95" shininess="0.9"/>
+
+    <material name="grab_point_mat"
+              rgba="0.85 0.12 0.12 1.0"
+              specular="0.5" shininess="0.4"/>
+
+    <material name="flex_joint_mat"
+              rgba="0.92 0.52 0.05 1.0"
+              specular="0.4" shininess="0.3"/>
+
+    <material name="invisible_mat"
+              rgba="0 0 0 0"/>
+  </asset>
+
+  <default>
+    <default class="chaser">
+      <geom condim="3" friction="0.8 0.02 0.001"/>
+      <joint damping="0.0" stiffness="0.0" armature="0.01"/>
+    </default>
+    <default class="debris">
+      <geom condim="3" friction="0.6 0.02 0.001"/>
+    </default>
+    <default class="flex_panel">
+      <joint type="hinge" limited="true" range="-0.5 0.5"
+             damping="0.1" stiffness="8.0" armature="0.001"/>
+    </default>
+    <default class="rcs_thruster">
+      <site size="0.035 0.035 0.07" type="cylinder"/>
+    </default>
+  </default>
+
+  <worldbody>
+
+    <body name="chaser" pos="0 0 0" quat="1 0 0 0">
+      <freejoint name="chaser_free"/>
+      <inertial pos="0 0 0" mass="400" diaginertia="120 150 100"/>
+
+      <geom name="chaser_bus"
+            type="box" size="0.40 0.40 0.60"
+            material="chaser_body_mat" class="chaser"/>
+
+      <geom name="chaser_panel_py"
+            type="box" size="0.65 0.03 0.28"
+            pos="0 0.48 0.05"
+            material="chaser_panel_mat" class="chaser"/>
+      <geom name="chaser_panel_ny"
+            type="box" size="0.65 0.03 0.28"
+            pos="0 -0.48 0.05"
+            material="chaser_panel_mat" class="chaser"/>
+
+      <geom name="chaser_docking_ring"
+            type="cylinder" size="0.16 0.05"
+            pos="0 0 0.65"
+            material="grab_point_mat" class="chaser"/>
+
+      <site name="imu" pos="0 0 0" size="0.025" type="sphere"
+            material="flex_joint_mat"/>
+
+      <site name="rcs_px_1" pos="0.41  0.18  0.22" euler="0  1.5708 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_px_2" pos="0.41 -0.18 -0.22" euler="0  1.5708 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_nx_1" pos="-0.41  0.18 -0.22" euler="0 -1.5708 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_nx_2" pos="-0.41 -0.18  0.22" euler="0 -1.5708 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_py_1" pos=" 0.18 0.41  0.22" euler="-1.5708 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_py_2" pos="-0.18 0.41 -0.22" euler="-1.5708 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_ny_1" pos=" 0.18 -0.41 -0.22" euler="1.5708 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_ny_2" pos="-0.18 -0.41  0.22" euler="1.5708 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_pz_1" pos=" 0.18  0.18 0.61" euler="0 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_pz_2" pos="-0.18 -0.18 0.61" euler="0 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_nz_1" pos=" 0.18 -0.18 -0.61" euler="3.1416 0 0" material="thruster_mat" class="rcs_thruster"/>
+      <site name="rcs_nz_2" pos="-0.18  0.18 -0.61" euler="3.1416 0 0" material="thruster_mat" class="rcs_thruster"/>
+
+      <body name="rw_1" pos="0 0 0">
+        <inertial pos="0 0 0" mass="10" diaginertia="0.08 0.08 0.16"/>
+        <joint name="rw_joint_1" type="hinge" axis="0.57735 0 0.81650" damping="0.001" frictionloss="0.01"/>
+        <geom type="cylinder" size="0.15 0.05" material="thruster_mat" class="chaser"/>
+      </body>
+      <body name="rw_2" pos="0 0 0">
+        <inertial pos="0 0 0" mass="10" diaginertia="0.08 0.08 0.16"/>
+        <joint name="rw_joint_2" type="hinge" axis="0 0.57735 0.81650" damping="0.001" frictionloss="0.01"/>
+        <geom type="cylinder" size="0.15 0.05" material="thruster_mat" class="chaser"/>
+      </body>
+      <body name="rw_3" pos="0 0 0">
+        <inertial pos="0 0 0" mass="10" diaginertia="0.08 0.08 0.16"/>
+        <joint name="rw_joint_3" type="hinge" axis="-0.57735 0 0.81650" damping="0.001" frictionloss="0.01"/>
+        <geom type="cylinder" size="0.15 0.05" material="thruster_mat" class="chaser"/>
+      </body>
+      <body name="rw_4" pos="0 0 0">
+        <inertial pos="0 0 0" mass="10" diaginertia="0.08 0.08 0.16"/>
+        <joint name="rw_joint_4" type="hinge" axis="0 -0.57735 0.81650" damping="0.001" frictionloss="0.01"/>
+        <geom type="cylinder" size="0.15 0.05" material="thruster_mat" class="chaser"/>
+      </body>
+
+    </body>
+    <body name="debris_core" pos="0 0 4" quat="1 0 0 0">
+      <freejoint name="debris_free"/>
+      <inertial pos="0 0 0" mass="3000" diaginertia="12000 12000 1500"/>
+
+      <geom name="debris_main_body"
+            type="cylinder" size="2.0 2.75"
+            material="debris_body_mat" class="debris"/>
+
+      <geom name="debris_top_cap"
+            type="cylinder" size="1.80 0.12"
+            pos="0 0 2.87"
+            material="thruster_mat" class="debris"/>
+
+      <geom name="debris_nozzle"
+            type="cylinder" size="0.40 0.30"
+            pos="0 0 -3.05"
+            material="grab_point_mat" class="debris"/>
+
+      <site name="debris_paf" pos="0 0 -3.05" size="0.06" type="sphere"
+            material="grab_point_mat"/>
+      <site name="debris_imu" pos="0 0 0" size="0.025" type="sphere"
+            material="flex_joint_mat"/>
+
+      <body name="flex_boom_py" pos="0 2.05 0.3">
+        <joint name="flex_joint_py" type="hinge" axis="1 0 0"
+               limited="true" range="-0.5 0.5"
+               damping="8.0" stiffness="8.0" class="flex_panel"/>
+        <geom name="flex_boom_py_strut"
+              type="box" size="0.06 1.10 0.035"
+              pos="0 1.10 0"
+              material="debris_body_mat" class="debris"/>
+        <geom name="flex_panel_py_surf"
+              type="box" size="1.10 0.85 0.018"
+              pos="0 2.30 0"
+              material="debris_panel_mat" class="debris"/>
+        <site name="flex_site_py" pos="0 0 0" size="0.055" type="sphere"
+              material="flex_joint_mat"/>
+      </body>
+
+      <body name="flex_boom_ny" pos="0 -2.05 0.3">
+        <joint name="flex_joint_ny" type="hinge" axis="1 0 0"
+               limited="true" range="-0.5 0.5"
+               damping="8.0" stiffness="8.0" class="flex_panel"/>
+        <geom name="flex_boom_ny_strut"
+              type="box" size="0.06 1.10 0.035"
+              pos="0 -1.10 0"
+              material="debris_body_mat" class="debris"/>
+        <geom name="flex_panel_ny_surf"
+              type="box" size="1.10 0.85 0.018"
+              pos="0 -2.30 0"
+              material="debris_panel_mat" class="debris"/>
+        <site name="flex_site_ny" pos="0 0 0" size="0.055" type="sphere"
+              material="flex_joint_mat"/>
+      </body>
+
+      <body name="flex_boom_px" pos="2.05 0 0.3">
+        <joint name="flex_joint_px" type="hinge" axis="0 1 0"
+               limited="true" range="-0.1 0.1"
+               damping="12.0" stiffness="80.0" class="flex_panel"/>
+        <geom name="flex_boom_px_geom"
+              type="cylinder" size="0.05 0.90"
+              pos="0.90 0 0"
+              material="invisible_mat" class="debris"/>
+      </body>
+
+    </body>
+    </worldbody>
+
+  <equality>
+    <weld name="capture_weld" body1="chaser" body2="debris_core" relpose="0 0 4 1 0 0 0"/>
+  </equality>
+
+  <sensor>
+    <gyro         name="imu_gyro"   site="imu" noise="0.0001"/>
+    <gyro         name="debris_gyro" site="debris_imu" noise="0.0001"/>
+    <framequat    name="imu_quat"   objtype="site" objname="imu" noise="0.00015"/>
+    <accelerometer name="imu_accel" site="imu" noise="0.001"/>
+
+    <jointpos     name="flex_angle_py" joint="flex_joint_py"/>
+    <jointpos     name="flex_angle_ny" joint="flex_joint_ny"/>
+    <jointpos     name="flex_angle_px" joint="flex_joint_px"/>
+    <jointvel     name="flex_vel_py"   joint="flex_joint_py"/>
+    <jointvel     name="flex_vel_ny"   joint="flex_joint_ny"/>
+    <jointvel     name="flex_vel_px"   joint="flex_joint_px"/>
+
+    <jointvel name="rw_vel_1" joint="rw_joint_1"/>
+    <jointvel name="rw_vel_2" joint="rw_joint_2"/>
+    <jointvel name="rw_vel_3" joint="rw_joint_3"/>
+    <jointvel name="rw_vel_4" joint="rw_joint_4"/>
+  </sensor>
+
+  <actuator>
+    <general name="thr_px_1" site="rcs_px_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_px_2" site="rcs_px_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_nx_1" site="rcs_nx_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_nx_2" site="rcs_nx_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_py_1" site="rcs_py_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_py_2" site="rcs_py_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_ny_1" site="rcs_ny_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_ny_2" site="rcs_ny_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_pz_1" site="rcs_pz_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_pz_2" site="rcs_pz_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_nz_1" site="rcs_nz_1" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="thr_nz_2" site="rcs_nz_2" gear="0 0 20 0 0 0" ctrlrange="0 1" ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+
+    <motor name="rw_motor_1" joint="rw_joint_1" ctrlrange="-1.0 1.0" forcerange="-1.5 1.5"/>
+    <motor name="rw_motor_2" joint="rw_joint_2" ctrlrange="-1.0 1.0" forcerange="-1.5 1.5"/>
+    <motor name="rw_motor_3" joint="rw_joint_3" ctrlrange="-1.0 1.0" forcerange="-1.5 1.5"/>
+    <motor name="rw_motor_4" joint="rw_joint_4" ctrlrange="-1.0 1.0" forcerange="-1.5 1.5"/>
+  </actuator>
+
+</mujoco>

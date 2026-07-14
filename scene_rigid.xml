@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════
+  ORBITAL DETUMBLING — MuJoCo RL Environment  (scene_rigid.xml)
+  Project UnTumble · Phase 1: Rigid Body Baseline
+  ═══════════════════════════════════════════════════════════════════════════════
+
+  ACTUATOR INDEX → WORLD FORCE → TORQUE MAP  (20 total)
+  ────────────────────────────────────────────────────────────────────────────
+  Euler convention: intrinsic XYZ. gear="0 0 100" fires in site's local +Z.
+  Verified by symbolic cross-product:  τ = r × F,  all in body frame.
+
+  idx  name        pos (x,y,z)        world F    τx      τy      τz     purpose
+  ───  ──────────  ─────────────────  ─────────  ──────  ──────  ──────  ───────
+   0   A_thr_px   (+0.50, 0,+2.60)   −X         0      −2.60    0      roll−
+   1   A_thr_nx   (−0.50, 0,+2.60)   +X         0      +2.60    0      roll+
+   2   A_thr_py   ( 0,+0.50,+2.60)   +Y        −2.60    0       0      pitch+
+   3   A_thr_ny   ( 0,−0.50,+2.60)   −Y        +2.60    0       0      pitch−
+   4   A_thr_pz   ( 0, 0,+3.05)      +Z         0       0       0      linear
+   5   A_thr_nz   ( 0, 0,+2.18)      −Z         0       0       0      linear
+   6   B_thr_px   (+0.50, 0,−2.60)   −X         0      +2.60    0      roll+
+   7   B_thr_nx   (−0.50, 0,−2.60)   +X         0      −2.60    0      roll−
+   8   B_thr_py   ( 0,+0.50,−2.60)   +Y        +2.60    0       0      pitch−
+   9   B_thr_ny   ( 0,−0.50,−2.60)   −Y        −2.60    0       0      pitch+
+  10   B_thr_pz   ( 0, 0,−2.18)      +Z         0       0       0      linear
+  11   B_thr_nz   ( 0, 0,−3.05)      −Z         0       0       0      linear
+  ── YAW NOZZLES ── (20 N each; pair net F = 0, net τ = (0, 0, ±0.70) per chaser)
+  12   A_yaw_p1   ( 0,+0.35,+2.60)   −X         0      −2.60   +0.35   yaw+
+  13   A_yaw_p2   ( 0,−0.35,+2.60)   +X         0      +2.60   +0.35   yaw+
+  14   B_yaw_p1   ( 0,+0.35,−2.60)   −X         0      +2.60   +0.35   yaw+
+  15   B_yaw_p2   ( 0,−0.35,−2.60)   +X         0      −2.60   +0.35   yaw+
+  16   A_yaw_n1   ( 0,+0.35,+2.60)   +X         0      +2.60   −0.35   yaw−
+  17   A_yaw_n2   ( 0,−0.35,+2.60)   −X         0      −2.60   −0.35   yaw−
+  18   B_yaw_n1   ( 0,+0.35,−2.60)   +X         0      −2.60   −0.35   yaw−
+  19   B_yaw_n2   ( 0,−0.35,−2.60)   −X         0      +2.60   −0.35   yaw−
+
+  Authority:
+    Roll/Pitch: 2 × 100 N × 2.60 m = 520 N·m
+    Yaw:        4 × 20  N × 0.35 m =  28 N·m  (5.4% of lateral — intentional)
+
+  Yaw pair firing for Agent 2 (discrete axis-mapped):
+    +yaw command → fire idx 12,13,14,15 simultaneously
+    −yaw command → fire idx 16,17,18,19 simultaneously
+
+  Note on per-nozzle τx/τy for yaw nozzles:
+    Individual nozzles do carry a τy component (±2.6 N·m per nozzle).
+    Within each PAIR they cancel exactly. Always fire yaw nozzles in pairs.
+  ═══════════════════════════════════════════════════════════════════════════════
+-->
+<mujoco model="orbital_detumble_dual_chaser_yaw">
+
+  <!-- ──────────────────────────── COMPILER ──────────────────────────────── -->
+  <compiler angle="radian" autolimits="true"/>
+
+  <!-- ──────────────────────────── SIMULATION ────────────────────────────── -->
+  <option
+    gravity    = "0 0 0"
+    timestep   = "0.005"
+    integrator = "RK4"
+    cone       = "elliptic"
+    impratio   = "10"
+    tolerance  = "1e-10">
+    <flag contact="disable"/>
+  </option>
+
+  <!-- ──────────────────────────── VISUAL QUALITY ────────────────────────── -->
+  <visual>
+    <global azimuth="135" elevation="-20" fovy="55"/>
+    <quality shadowsize="4096" offsamples="8"/>
+    <headlight
+      ambient  = "0.04 0.04 0.06"
+      diffuse  = "0.90 0.88 0.82"
+      specular = "0.70 0.68 0.62"/>
+    <rgba haze="0 0 0 0"/>
+    <map stiffness="100" stiffnessrot="100" znear="0.05" zfar="2000"/>
+  </visual>
+
+  <!-- ──────────────────────────── ASSETS ────────────────────────────────── -->
+  <asset>
+
+    <texture name="tex_starfield"
+             type="skybox" builtin="gradient"
+             rgb1="0.000 0.000 0.010" rgb2="0.005 0.005 0.020"
+             width="1024" height="1024"
+             mark="random" markrgb="1.0 1.0 1.0" random="0.004"/>
+
+    <texture name="tex_solar_cell"
+             type="2d" builtin="checker"
+             rgb1="0.02 0.04 0.28" rgb2="0.04 0.08 0.48"
+             width="256" height="256" mark="none"/>
+    <material name="mat_solar_cell"
+              texture="tex_solar_cell" texrepeat="8 8"
+              specular="0.55" shininess="0.65" reflectance="0.15" rgba="1 1 1 1"/>
+
+    <texture name="tex_mli"
+             type="2d" builtin="gradient"
+             rgb1="0.78 0.62 0.08" rgb2="0.55 0.42 0.04"
+             width="128" height="128"
+             mark="random" markrgb="0.90 0.75 0.15" random="0.015"/>
+    <material name="mat_mli_gold"
+              texture="tex_mli" texrepeat="3 3"
+              specular="0.80" shininess="0.75" reflectance="0.35" rgba="1 1 1 1"/>
+
+    <material name="mat_silver_endcap"
+              rgba="0.82 0.84 0.88 1" specular="0.95" shininess="0.90" reflectance="0.55"/>
+    <material name="mat_radiator"
+              rgba="0.10 0.10 0.14 1" specular="0.30" shininess="0.20"/>
+    <material name="mat_strut"
+              rgba="0.88 0.90 0.92 1" specular="0.55" shininess="0.40"/>
+    <material name="mat_rcs_plate"
+              rgba="0.45 0.46 0.50 1" specular="0.75" shininess="0.65"/>
+    <material name="mat_nozzle"
+              rgba="0.12 0.12 0.14 1" specular="0.92" shininess="0.88" reflectance="0.20"/>
+    <!-- Yaw nozzle: distinct dark-green tint so they are visually identifiable -->
+    <material name="mat_yaw_nozzle"
+              rgba="0.08 0.20 0.12 1" specular="0.85" shininess="0.80"/>
+    <material name="mat_chaserA_body"
+              rgba="0.30 0.42 0.62 1" specular="0.80" shininess="0.70" reflectance="0.30"/>
+    <material name="mat_chaserA_accent"
+              rgba="0.95 0.50 0.05 1" specular="0.60" shininess="0.45"/>
+    <material name="mat_chaserB_body"
+              rgba="0.55 0.30 0.20 1" specular="0.80" shininess="0.70" reflectance="0.30"/>
+    <material name="mat_chaserB_accent"
+              rgba="0.15 0.80 0.35 1" specular="0.60" shininess="0.45"/>
+    <material name="mat_grapple_arm"
+              rgba="0.60 0.62 0.65 1" specular="0.88" shininess="0.80" reflectance="0.40"/>
+    <material name="mat_dish"
+              rgba="0.22 0.22 0.26 1" specular="0.70" shininess="0.60" reflectance="0.25"/>
+
+  </asset>
+
+  <!-- ──────────────────────────── DEFAULTS ──────────────────────────────── -->
+  <default>
+    <default class="phys">
+      <geom condim="3" rgba="1 1 1 0" friction="0.8 0.02 0.001"/>
+    </default>
+    <default class="viz">
+      <geom mass="0" contype="0" conaffinity="0"/>
+    </default>
+    <!-- Main RCS sites: cylinder nozzle shape -->
+    <default class="rcs_main">
+      <site size="0.045 0.045 0.08" type="cylinder"/>
+    </default>
+    <!-- Yaw RCS sites: smaller cylinder to reflect lower thrust -->
+    <default class="rcs_yaw">
+      <site size="0.030 0.030 0.06" type="cylinder"/>
+    </default>
+  </default>
+
+  <!-- ══════════════════════════ WORLD BODY ══════════════════════════════════ -->
+  <worldbody>
+
+    <light name="sun"
+           pos="80 -30 40" dir="-1 0.4 -0.5"
+           diffuse="1.00 0.97 0.90" specular="0.80 0.78 0.70"
+           directional="true" castshadow="true"/>
+    <light name="earthshine"
+           pos="-60 20 -30" dir="1 -0.3 0.5"
+           diffuse="0.04 0.06 0.10" specular="0.01 0.01 0.02"
+           directional="true" castshadow="false"/>
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         UNIFIED SATELLITE BODY — single freejoint, no welds
+         ════════════════════════════════════════════════════════════════════ -->
+    <body name="satellite" pos="0 0 0" quat="1 0 0 0">
+      <freejoint name="satellite_free"/>
+
+      <!-- ── PHYSICS GEOMS (invisible, carry all mass) ── -->
+
+      <!-- Debris: cylinder r=1.0, hl=2.0, mass=500 kg -->
+      <geom name="phys_debris"
+            class="phys" type="cylinder" size="1.0 2.0" pos="0 0 0"
+            mass="500" rgba="1 1 1 0"/>
+
+      <!-- Chaser A: box 0.5×0.5×0.5 at +Z pole, mass=50 kg -->
+      <geom name="phys_chaserA"
+            class="phys" type="box" size="0.5 0.5 0.5" pos="0 0 2.5"
+            mass="50" rgba="1 1 1 0"/>
+
+      <!-- Chaser B: box 0.5×0.5×0.5 at −Z pole, mass=50 kg -->
+      <geom name="phys_chaserB"
+            class="phys" type="box" size="0.5 0.5 0.5" pos="0 0 -2.5"
+            mass="50" rgba="1 1 1 0"/>
+
+      <!-- ── IMU SITE ── -->
+      <site name="imu_site" pos="0 0 0" size="0.02" type="sphere"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           VISUAL GEOMS — DEBRIS CORE (hexagonal bus + end-caps + radiators)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <geom name="viz_bus_f0" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="0 0.90 0" material="mat_mli_gold"/>
+      <geom name="viz_bus_f1" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="0.779 0.45 0"
+            euler="0 0 1.0472" material="mat_mli_gold"/>
+      <geom name="viz_bus_f2" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="0.779 -0.45 0"
+            euler="0 0 2.0944" material="mat_mli_gold"/>
+      <geom name="viz_bus_f3" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="0 -0.90 0" material="mat_mli_gold"/>
+      <geom name="viz_bus_f4" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="-0.779 -0.45 0"
+            euler="0 0 1.0472" material="mat_mli_gold"/>
+      <geom name="viz_bus_f5" class="viz" type="box"
+            size="0.90 0.18 1.95" pos="-0.779 0.45 0"
+            euler="0 0 2.0944" material="mat_mli_gold"/>
+
+      <geom name="viz_endcap_north" class="viz" type="cylinder"
+            size="0.95 0.10" pos="0 0 2.05" material="mat_silver_endcap"/>
+      <geom name="viz_endcap_south" class="viz" type="cylinder"
+            size="0.95 0.10" pos="0 0 -2.05" material="mat_silver_endcap"/>
+      <geom name="viz_radiator_p" class="viz" type="box"
+            size="0.82 0.02 1.60" pos="0 0.96 0" material="mat_radiator"/>
+      <geom name="viz_radiator_n" class="viz" type="box"
+            size="0.82 0.02 1.60" pos="0 -0.96 0" material="mat_radiator"/>
+      <geom name="viz_equator_ring" class="viz" type="cylinder"
+            size="1.02 0.06" pos="0 0 0" material="mat_silver_endcap"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           VISUAL GEOMS — SOLAR ARRAYS (±X axis, 3 panel segments per wing)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <geom name="viz_boom_px" class="viz" type="box"
+            size="2.20 0.04 0.04" pos="2.20 0 0.30" material="mat_strut"/>
+      <geom name="viz_panel_px_1" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="1.50 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_panel_px_2" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="2.24 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_panel_px_3" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="3.00 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_strut_px_a" class="viz" type="box"
+            size="0.02 0.02 0.92" pos="2.22 0 0.30" material="mat_strut"/>
+      <geom name="viz_strut_px_b" class="viz" type="box"
+            size="0.02 0.02 0.92" pos="2.98 0 0.30" material="mat_strut"/>
+
+      <geom name="viz_boom_nx" class="viz" type="box"
+            size="2.20 0.04 0.04" pos="-2.20 0 0.30" material="mat_strut"/>
+      <geom name="viz_panel_nx_1" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="-1.50 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_panel_nx_2" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="-2.24 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_panel_nx_3" class="viz" type="box"
+            size="0.72 0.015 0.90" pos="-3.00 0 0.30" material="mat_solar_cell"/>
+      <geom name="viz_strut_nx_a" class="viz" type="box"
+            size="0.02 0.02 0.92" pos="-2.22 0 0.30" material="mat_strut"/>
+      <geom name="viz_strut_nx_b" class="viz" type="box"
+            size="0.02 0.02 0.92" pos="-2.98 0 0.30" material="mat_strut"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           VISUAL GEOMS — HIGH-GAIN DISH (+Y axis)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <geom name="viz_dish_boom" class="viz" type="cylinder"
+            size="0.04 0.50" pos="0 1.45 -0.60" euler="1.5708 0 0" material="mat_strut"/>
+      <geom name="viz_dish_rim" class="viz" type="cylinder"
+            size="0.55 0.025" pos="0 1.98 -0.60" euler="1.5708 0 0" material="mat_dish"/>
+      <geom name="viz_dish_mid" class="viz" type="cylinder"
+            size="0.38 0.020" pos="0 1.93 -0.60" euler="1.5708 0 0" material="mat_dish"/>
+      <geom name="viz_dish_inner" class="viz" type="cylinder"
+            size="0.20 0.015" pos="0 1.88 -0.60" euler="1.5708 0 0" material="mat_dish"/>
+      <geom name="viz_dish_feedhorn" class="viz" type="cylinder"
+            size="0.04 0.18" pos="0 1.72 -0.60" euler="1.5708 0 0" material="mat_silver_endcap"/>
+      <geom name="viz_feedstrut_pp" class="viz" type="box"
+            size="0.38 0.012 0.012" pos="0 1.90 -0.42" euler="0 0 0.7854" material="mat_strut"/>
+      <geom name="viz_feedstrut_np" class="viz" type="box"
+            size="0.38 0.012 0.012" pos="0 1.90 -0.78" euler="0 0 0.7854" material="mat_strut"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           VISUAL GEOMS — CHASER A  (North / +Z, blue-grey / orange)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <geom name="viz_chaA_bus" class="viz" type="box"
+            size="0.42 0.42 0.38" pos="0 0 2.62" material="mat_chaserA_body"/>
+      <geom name="viz_chaA_topdeck" class="viz" type="box"
+            size="0.44 0.44 0.03" pos="0 0 3.01" material="mat_rcs_plate"/>
+      <geom name="viz_chaA_adapter" class="viz" type="cylinder"
+            size="0.30 0.06" pos="0 0 2.22" material="mat_chaserA_accent"/>
+      <geom name="viz_chaA_stripe_px" class="viz" type="box"
+            size="0.04 0.44 0.40" pos="0.44 0 2.62" material="mat_chaserA_accent"/>
+      <geom name="viz_chaA_stripe_nx" class="viz" type="box"
+            size="0.04 0.44 0.40" pos="-0.44 0 2.62" material="mat_chaserA_accent"/>
+      <geom name="viz_chaA_panel" class="viz" type="box"
+            size="0.55 0.008 0.30" pos="0 0.55 2.62" material="mat_solar_cell"/>
+      <geom name="viz_chaA_rcsplate_px" class="viz" type="box"
+            size="0.03 0.38 0.34" pos="0.46 0 2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaA_rcsplate_nx" class="viz" type="box"
+            size="0.03 0.38 0.34" pos="-0.46 0 2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaA_rcsplate_py" class="viz" type="box"
+            size="0.38 0.03 0.34" pos="0 0.46 2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaA_rcsplate_ny" class="viz" type="box"
+            size="0.38 0.03 0.34" pos="0 -0.46 2.62" material="mat_rcs_plate"/>
+      <!-- Grappling arms A -->
+      <geom name="viz_chaA_arm_upper" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0.25 0 2.35" euler="0.3 0 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaA_arm_lower" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0.25 0 2.12" euler="-0.3 0 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaA_claw" class="viz" type="sphere"
+            size="0.06" pos="0.25 0 2.00" material="mat_chaserA_accent"/>
+      <geom name="viz_chaA_arm2_upper" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="-0.25 0 2.35" euler="-0.3 0 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaA_arm2_lower" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="-0.25 0 2.12" euler="0.3 0 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaA_claw2" class="viz" type="sphere"
+            size="0.06" pos="-0.25 0 2.00" material="mat_chaserA_accent"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           VISUAL GEOMS — CHASER B  (South / −Z, warm-grey / green)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <geom name="viz_chaB_bus" class="viz" type="box"
+            size="0.42 0.42 0.38" pos="0 0 -2.62" material="mat_chaserB_body"/>
+      <geom name="viz_chaB_botdeck" class="viz" type="box"
+            size="0.44 0.44 0.03" pos="0 0 -3.01" material="mat_rcs_plate"/>
+      <geom name="viz_chaB_adapter" class="viz" type="cylinder"
+            size="0.30 0.06" pos="0 0 -2.22" material="mat_chaserB_accent"/>
+      <geom name="viz_chaB_stripe_py" class="viz" type="box"
+            size="0.44 0.04 0.40" pos="0 0.44 -2.62" material="mat_chaserB_accent"/>
+      <geom name="viz_chaB_stripe_ny" class="viz" type="box"
+            size="0.44 0.04 0.40" pos="0 -0.44 -2.62" material="mat_chaserB_accent"/>
+      <geom name="viz_chaB_panel" class="viz" type="box"
+            size="0.55 0.008 0.30" pos="0 -0.55 -2.62" material="mat_solar_cell"/>
+      <geom name="viz_chaB_rcsplate_px" class="viz" type="box"
+            size="0.03 0.38 0.34" pos="0.46 0 -2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaB_rcsplate_nx" class="viz" type="box"
+            size="0.03 0.38 0.34" pos="-0.46 0 -2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaB_rcsplate_py" class="viz" type="box"
+            size="0.38 0.03 0.34" pos="0 0.46 -2.62" material="mat_rcs_plate"/>
+      <geom name="viz_chaB_rcsplate_ny" class="viz" type="box"
+            size="0.38 0.03 0.34" pos="0 -0.46 -2.62" material="mat_rcs_plate"/>
+      <!-- Grappling arms B -->
+      <geom name="viz_chaB_arm_upper" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0 0.25 -2.35" euler="0 0.3 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaB_arm_lower" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0 0.25 -2.12" euler="0 -0.3 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaB_claw" class="viz" type="sphere"
+            size="0.06" pos="0 0.25 -2.00" material="mat_chaserB_accent"/>
+      <geom name="viz_chaB_arm2_upper" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0 -0.25 -2.35" euler="0 -0.3 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaB_arm2_lower" class="viz" type="box"
+            size="0.04 0.04 0.22" pos="0 -0.25 -2.12" euler="0 0.3 0" material="mat_grapple_arm"/>
+      <geom name="viz_chaB_claw2" class="viz" type="sphere"
+            size="0.06" pos="0 -0.25 -2.00" material="mat_chaserB_accent"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           RCS SITES — CHASER A MAIN  (idx 0–5)
+           euler(0,-π/2,0)→F=-X  euler(0,+π/2,0)→F=+X
+           euler(-π/2,0,0)→F=+Y  euler(+π/2,0,0)→F=-Y
+           euler(0,0,0)→F=+Z     euler(π,0,0)→F=-Z
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <!-- idx 0  A_thr_px  F=−X  τy=−2.60 -->
+      <site name="A_thr_px" class="rcs_main"
+            pos=" 0.50 0 2.60" euler="0 -1.5708 0" material="mat_nozzle"/>
+      <!-- idx 1  A_thr_nx  F=+X  τy=+2.60 -->
+      <site name="A_thr_nx" class="rcs_main"
+            pos="-0.50 0 2.60" euler="0  1.5708 0" material="mat_nozzle"/>
+      <!-- idx 2  A_thr_py  F=+Y  τx=−2.60 -->
+      <site name="A_thr_py" class="rcs_main"
+            pos="0  0.50 2.60" euler="-1.5708 0 0" material="mat_nozzle"/>
+      <!-- idx 3  A_thr_ny  F=−Y  τx=+2.60 -->
+      <site name="A_thr_ny" class="rcs_main"
+            pos="0 -0.50 2.60" euler=" 1.5708 0 0" material="mat_nozzle"/>
+      <!-- idx 4  A_thr_pz  F=+Z  no torque -->
+      <site name="A_thr_pz" class="rcs_main"
+            pos="0 0 3.05" euler="0 0 0" material="mat_nozzle"/>
+      <!-- idx 5  A_thr_nz  F=−Z  no torque -->
+      <site name="A_thr_nz" class="rcs_main"
+            pos="0 0 2.18" euler="3.14159 0 0" material="mat_nozzle"/>
+
+      <!-- ── CHASER A MAIN NOZZLE BELLS (visual) ── -->
+      <geom name="viz_A_noz_px" class="viz" type="cylinder"
+            size="0.055 0.075" pos=" 0.56 0 2.60" euler="0 1.5708 0" material="mat_nozzle"/>
+      <geom name="viz_A_noz_nx" class="viz" type="cylinder"
+            size="0.055 0.075" pos="-0.56 0 2.60" euler="0 1.5708 0" material="mat_nozzle"/>
+      <geom name="viz_A_noz_py" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0  0.56 2.60" euler="1.5708 0 0" material="mat_nozzle"/>
+      <geom name="viz_A_noz_ny" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 -0.56 2.60" euler="1.5708 0 0" material="mat_nozzle"/>
+      <geom name="viz_A_noz_pz" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 0 3.12"  euler="0 0 0"      material="mat_nozzle"/>
+      <geom name="viz_A_noz_nz" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 0 2.12"  euler="0 0 0"      material="mat_nozzle"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           RCS SITES — CHASER B MAIN  (idx 6–11)
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <!-- idx 6  B_thr_px  F=−X  τy=+2.60 -->
+      <site name="B_thr_px" class="rcs_main"
+            pos=" 0.50 0 -2.60" euler="0 -1.5708 0" material="mat_nozzle"/>
+      <!-- idx 7  B_thr_nx  F=+X  τy=−2.60 -->
+      <site name="B_thr_nx" class="rcs_main"
+            pos="-0.50 0 -2.60" euler="0  1.5708 0" material="mat_nozzle"/>
+      <!-- idx 8  B_thr_py  F=+Y  τx=+2.60 -->
+      <site name="B_thr_py" class="rcs_main"
+            pos="0  0.50 -2.60" euler="-1.5708 0 0" material="mat_nozzle"/>
+      <!-- idx 9  B_thr_ny  F=−Y  τx=−2.60 -->
+      <site name="B_thr_ny" class="rcs_main"
+            pos="0 -0.50 -2.60" euler=" 1.5708 0 0" material="mat_nozzle"/>
+      <!-- idx 10 B_thr_pz  F=+Z  no torque -->
+      <site name="B_thr_pz" class="rcs_main"
+            pos="0 0 -2.18" euler="0 0 0" material="mat_nozzle"/>
+      <!-- idx 11 B_thr_nz  F=−Z  no torque -->
+      <site name="B_thr_nz" class="rcs_main"
+            pos="0 0 -3.05" euler="3.14159 0 0" material="mat_nozzle"/>
+
+      <!-- ── CHASER B MAIN NOZZLE BELLS (visual) ── -->
+      <geom name="viz_B_noz_px" class="viz" type="cylinder"
+            size="0.055 0.075" pos=" 0.56 0 -2.60" euler="0 1.5708 0" material="mat_nozzle"/>
+      <geom name="viz_B_noz_nx" class="viz" type="cylinder"
+            size="0.055 0.075" pos="-0.56 0 -2.60" euler="0 1.5708 0" material="mat_nozzle"/>
+      <geom name="viz_B_noz_py" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0  0.56 -2.60" euler="1.5708 0 0" material="mat_nozzle"/>
+      <geom name="viz_B_noz_ny" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 -0.56 -2.60" euler="1.5708 0 0" material="mat_nozzle"/>
+      <geom name="viz_B_noz_pz" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 0 -2.12" euler="0 0 0"      material="mat_nozzle"/>
+      <geom name="viz_B_noz_nz" class="viz" type="cylinder"
+            size="0.055 0.075" pos="0 0 -3.12" euler="0 0 0"      material="mat_nozzle"/>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           YAW SITES — CHASER A  (idx 12–17)
+           Geometry: ±Y offset from axis, firing ±X.
+           Pairs must fire together for pure yaw (zero cross-torque).
+             +yaw pair A: idx 12 + 13  →  net τ = (0, 0, +0.70) per chaser
+             −yaw pair A: idx 16 + 17  →  net τ = (0, 0, −0.70) per chaser
+
+           Verified cross-products:
+             A_yaw_p1 r=(0,+0.35,+2.6) F=(−1,0,0): τ=(0,−2.60,+0.35)
+             A_yaw_p2 r=(0,−0.35,+2.6) F=(+1,0,0): τ=(0,+2.60,+0.35)
+             Pair sum:                               τ=(0,   0 ,+0.70) ✓
+             A_yaw_n1 r=(0,+0.35,+2.6) F=(+1,0,0): τ=(0,+2.60,−0.35)
+             A_yaw_n2 r=(0,−0.35,+2.6) F=(−1,0,0): τ=(0,−2.60,−0.35)
+             Pair sum:                               τ=(0,   0 ,−0.70) ✓
+           ══════════════════════════════════════════════════════════════════ -->
+
+      <!-- idx 12  A_yaw_p1  F=−X @ y=+0.35  → τz=+0.35 (fire with idx 13) -->
+      <site name="A_yaw_p1" class="rcs_yaw"
+            pos="0  0.35 2.60" euler="0 -1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 13  A_yaw_p2  F=+X @ y=−0.35  → τz=+0.35 (fire with idx 12) -->
+      <site name="A_yaw_p2" class="rcs_yaw"
+            pos="0 -0.35 2.60" euler="0  1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 14  B_yaw_p1  F=−X @ y=+0.35  → τz=+0.35 (fire with idx 15) -->
+      <site name="B_yaw_p1" class="rcs_yaw"
+            pos="0  0.35 -2.60" euler="0 -1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 15  B_yaw_p2  F=+X @ y=−0.35  → τz=+0.35 (fire with idx 14) -->
+      <site name="B_yaw_p2" class="rcs_yaw"
+            pos="0 -0.35 -2.60" euler="0  1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 16  A_yaw_n1  F=+X @ y=+0.35  → τz=−0.35 (fire with idx 17) -->
+      <site name="A_yaw_n1" class="rcs_yaw"
+            pos="0  0.35 2.60" euler="0  1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 17  A_yaw_n2  F=−X @ y=−0.35  → τz=−0.35 (fire with idx 16) -->
+      <site name="A_yaw_n2" class="rcs_yaw"
+            pos="0 -0.35 2.60" euler="0 -1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 18  B_yaw_n1  F=+X @ y=+0.35  → τz=−0.35 (fire with idx 19) -->
+      <site name="B_yaw_n1" class="rcs_yaw"
+            pos="0  0.35 -2.60" euler="0  1.5708 0" material="mat_yaw_nozzle"/>
+      <!-- idx 19  B_yaw_n2  F=−X @ y=−0.35  → τz=−0.35 (fire with idx 18) -->
+      <site name="B_yaw_n2" class="rcs_yaw"
+            pos="0 -0.35 -2.60" euler="0 -1.5708 0" material="mat_yaw_nozzle"/>
+
+      <!-- ── YAW NOZZLE BELLS (visual, smaller, dark green tint) ── -->
+      <geom name="viz_A_yaw_p1_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0  0.42 2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_A_yaw_p2_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0 -0.42 2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_A_yaw_n1_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0  0.42 2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_A_yaw_n2_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0 -0.42 2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_B_yaw_p1_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0  0.42 -2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_B_yaw_p2_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0 -0.42 -2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_B_yaw_n1_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0  0.42 -2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+      <geom name="viz_B_yaw_n2_bell" class="viz" type="cylinder"
+            size="0.035 0.055" pos="0 -0.42 -2.60" euler="0 1.5708 0" material="mat_yaw_nozzle"/>
+
+    </body><!-- end satellite -->
+
+  </worldbody>
+
+  <!-- ══════════════════════════ SENSORS ════════════════════════════════════ -->
+  <sensor>
+    <gyro          name="imu_gyro"   site="imu_site" noise="0.0001"/>
+    <accelerometer name="imu_accel"  site="imu_site" noise="0.0005"/>
+    <framequat     name="imu_quat"   objtype="site" objname="imu_site" noise="0.0001"/>
+    <frameangvel   name="sat_angvel" objtype="body" objname="satellite"/>
+    <framelinvel   name="sat_linvel" objtype="body" objname="satellite"/>
+  </sensor>
+
+  <!-- ══════════════════════════ ACTUATORS ══════════════════════════════════ -->
+  <!--
+    Main thrusters: gear="0 0 100 0 0 0"  →  100 N max, ctrlrange [0,1]
+    Yaw  thrusters: gear="0 0 20  0 0 0"  →   20 N max, ctrlrange [0,1]
+    All actuators are unidirectional (open/close valves).
+  -->
+  <actuator>
+
+    <!-- ── CHASER A MAIN RCS (idx 0–5) ── -->
+    <general name="A_thr_px" site="A_thr_px"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="A_thr_nx" site="A_thr_nx"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="A_thr_py" site="A_thr_py"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="A_thr_ny" site="A_thr_ny"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="A_thr_pz" site="A_thr_pz"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="A_thr_nz" site="A_thr_nz"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+
+    <!-- ── CHASER B MAIN RCS (idx 6–11) ── -->
+    <general name="B_thr_px" site="B_thr_px"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="B_thr_nx" site="B_thr_nx"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="B_thr_py" site="B_thr_py"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="B_thr_ny" site="B_thr_ny"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="B_thr_pz" site="B_thr_pz"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+    <general name="B_thr_nz" site="B_thr_nz"
+             gear="0 0 100 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 100"/>
+
+    <!-- ── CHASER A YAW RCS (idx 12–17) ── -->
+    <!-- +yaw pair: fire 12+13 together → net τz = +14 N·m (0 cross-torque) -->
+    <general name="A_yaw_p1" site="A_yaw_p1"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="A_yaw_p2" site="A_yaw_p2"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <!-- B yaw +: fire 14+15 together -->
+    <general name="B_yaw_p1" site="B_yaw_p1"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="B_yaw_p2" site="B_yaw_p2"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <!-- −yaw pair: fire 16+17 together → net τz = −14 N·m (0 cross-torque) -->
+    <general name="A_yaw_n1" site="A_yaw_n1"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="A_yaw_n2" site="A_yaw_n2"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <!-- B yaw −: fire 18+19 together -->
+    <general name="B_yaw_n1" site="B_yaw_n1"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+    <general name="B_yaw_n2" site="B_yaw_n2"
+             gear="0 0 20 0 0 0" ctrlrange="0 1"
+             ctrllimited="true" forcelimited="true" forcerange="0 20"/>
+
+  </actuator>
+
+</mujoco>

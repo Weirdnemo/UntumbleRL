@@ -1,0 +1,2 @@
+timestep,mean_ep_reward,mean_ep_len,mean_omega_norm_final,success_rate,mean_fuel
+4096,-2187.460668,4000.0,0.704381088904337,0.0,10.744918823242188

@@ -1,0 +1,21 @@
+# Python Cache
+__pycache__/
+*.pyc
+
+# Massive MuJoCo Build Artifacts
+mujoco/build/
+mujoco/*-build/
+mujoco/*-subbuild/
+
+# Heavy RL Checkpoints (Keeping best/final models)
+runs/*/checkpoints/
+*.zip
+!best_model.zip
+!final_model.zip
+!ppo_rigid_untumble_final.zip
+
+# TensorBoard & Evaluation Logs
+tensorboard_logs/
+runs/*/tb/
+*.npz
+*.pkl
