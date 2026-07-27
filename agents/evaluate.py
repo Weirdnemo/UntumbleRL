@@ -22,22 +22,16 @@ def evaluate_agent(agent_name="Agent2", seed="10", num_episodes=1000):
         print(f"❌ Error: Could not find model or normalization files in {model_dir}")
         return
 
-    # 1. Initialize a single test environment
-    # We use DummyVecEnv to wrap it so VecNormalize can be applied
+
     env = DummyVecEnv([lambda: Agent1Env()])
 
-    # 2. Load the exact normalization statistics (The "Eyes")
     env = VecNormalize.load(stats_path, env)
-    # Critical: Do not update normalization stats during evaluation!
     env.training = False
     env.norm_reward = False
 
-    # 3. Load the trained policy (The "Brain")
     model = PPO.load(model_path, env=env)
 
     print(f"Loaded successfully. Running {num_episodes} deterministic episodes...\n")
-
-    # Dictionaries to store raw data for statistical analysis
     eval_metrics = {
         "residual_omega": [],
         "detumble_time": [],
@@ -53,14 +47,12 @@ def evaluate_agent(agent_name="Agent2", seed="10", num_episodes=1000):
         done = False
 
         while not done:
-            # deterministic=True disables PPO exploration noise for pure performance
             action, _states = model.predict(obs, deterministic=True)
             obs, rewards, dones, infos = env.step(action)
             done = dones[0]
 
             if done:
                 info = infos[0]
-                # Extract the final metrics from your callback/env info dict
                 eval_metrics["residual_omega"].append(info.get("residual_omega", 0.0))
                 eval_metrics["detumble_time"].append(info.get("detumble_time", 0.0))
                 eval_metrics["total_dv_used"].append(info.get("total_dv_used", 0.0))
@@ -86,5 +78,4 @@ def evaluate_agent(agent_name="Agent2", seed="10", num_episodes=1000):
 
 
 if __name__ == "__main__":
-    # Test our baseline failure mode for Agent 1, Seed 10
     evaluate_agent(agent_name="Agent1", seed="10", num_episodes=1000)

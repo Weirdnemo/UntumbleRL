@@ -18,7 +18,6 @@ from typing import Any, Dict
 import numpy as np
 import torch
 
-# SB3 imports
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import (
     BaseCallback,
@@ -91,25 +90,24 @@ def get_hyperparams(agent_mode: int) -> Dict[str, Any]:
         )
 
     elif agent_mode == 3:
-        # Step 0.6 Breakthrough Config
         return dict(
             ppo_policy="MlpPolicy",
             ppo_learning_rate=1.5e-4,
             ppo_n_steps=2048,
-            ppo_batch_size=256,  # Lifted from 128 to decrease optimization noise over batches
+            ppo_batch_size=256,
             ppo_n_epochs=10,
             ppo_gamma=0.99,
             ppo_gae_lambda=0.95,
-            ppo_clip_range=0.25,  # Relaxed from 0.2 to allow deeper policy adjustments per update
+            ppo_clip_range=0.25,
             ppo_ent_coef=0.0,
             ppo_vf_coef=0.5,
-            ppo_max_grad_norm=0.5,  # Lifted from 0.3 to let meaningful structural gradients step up
+            ppo_max_grad_norm=0.5,
             ppo_policy_kwargs=dict(
                 net_arch=dict(pi=[256, 256], vf=[256, 256]),
                 activation_fn_name="tanh",
                 squash_output=True,
                 use_sde=True,
-                sde_sample_freq=16,  # Scaled from 4 to 16 to stabilize experimental trajectory actions
+                sde_sample_freq=16,
             ),
             train_total_timesteps=8_000_000,
             train_n_envs=8,

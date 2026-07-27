@@ -2,7 +2,6 @@ import time
 
 from stable_baselines3 import PPO
 
-# Assuming you kept the renamed file from earlier to avoid the namespace collision
 from rigid_untumble_env import RigidUnTumbleEnv
 
 
@@ -37,8 +36,6 @@ def evaluate_model():
         print(f"\n--- Starting Episode {ep + 1} ---")
 
         while not done:
-            # CRITICAL: deterministic=True strips away the exploration noise
-            # This executes the pure mathematical mean of the network's predictions
             action, _states = model.predict(obs, deterministic=True)
 
             # Step the environment
@@ -50,8 +47,6 @@ def evaluate_model():
             # Render the frame to the MuJoCo window
             env.render()
 
-            # Throttle the loop slightly so you can actually watch the thrusters
-            # Without this, your Ryzen 6600H will solve the 17-second sequence in half a second
             time.sleep(0.02)
 
         print(f"Episode {ep + 1} finished.")
@@ -61,7 +56,6 @@ def evaluate_model():
         print(f"Final Linear Velocity Norm: {info['v_norm']:.4f} m/s")
         print(f"Mission Success: {info['is_success']}")
 
-        # Pause for a second before the environment resets for the next episode
         time.sleep(1.5)
 
     env.close()

@@ -15,7 +15,7 @@ class Agent3Env(BaseDetumbleEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # RESIDUAL ACTION SPACE: AI can tweak duty cycles by +/- 10%
+
         self.action_space = spaces.Box(
             low=-0.1, high=0.1, shape=(12,), dtype=np.float32
         )

@@ -3,7 +3,6 @@ import os
 import sys
 from typing import Callable
 
-# Force Python to look in the UnTumble root directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import numpy as np
