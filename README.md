@@ -38,7 +38,7 @@ Reward shaping went through multiple iterations to close exploits the agent foun
 
 ## Status
 
-Active research project exploring detumbling control for uncooperative-target servicing scenarios. Techniques from this line of work have informed real onboard control applications. Code is in local-research form — no packaged release yet; run directly via `train.py` / `eval.py` with MuJoCo installed.
+Active research project exploring detumbling control for uncooperative-target servicing scenarios. The training setup and reward-shaping approach developed here were later adapted into a low-power onboard controller for a real satellite application. Code is in local-research form — no packaged release yet; run directly via `train.py` / `eval.py` with MuJoCo installed.
 
 ## Tech
 
